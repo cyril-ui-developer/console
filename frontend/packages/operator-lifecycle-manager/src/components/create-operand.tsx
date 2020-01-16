@@ -58,6 +58,7 @@ import { FieldGroup } from './descriptors/spec/field-group';
 import { referenceForProvidedAPI, ClusterServiceVersionLogo, providedAPIsFor } from './index';
 
 const annotationKey = 'alm-examples';
+const MAX_DEPTH = 4;
 
 enum Validations {
   maximum = 'maximum',
@@ -90,6 +91,7 @@ type FieldErrors = {
   [path: string]: string;
 };
 
+// Map CRD description to  spec descriptors
 const fieldsFor = (providedAPI: CRDDescription) =>
   _.get(providedAPI, 'specDescriptors', [] as Descriptor[]).map((desc) => ({
     path: desc.path,
@@ -101,169 +103,125 @@ const fieldsFor = (providedAPI: CRDDescription) =>
     capabilities: desc['x-descriptors'],
   })) as OperandField[];
 
-
-const operandFieldsHelper = (key, val, valProps, capabilitiesFor, specType) => {
-  return _.map(
-    valProps,
-    (nestedVal, nestedKey: string): OperandField => {
-      if (!['object', 'array'].includes(nestedVal.type)) {
-        return {
-          path: [key, nestedKey].join('.'),
-          displayName: _.startCase(nestedKey),
-          type: nestedVal.type,
-          required: _.get(val, 'required', []).includes(nestedKey),
-          validation: null,
-          capabilities: [
-            specType.concat(key) as SpecCapability.fieldGroup,
-            ...capabilitiesFor(nestedVal.type),
-          ],
-        };
-      }
-      if (!_.has(nestedVal, 'properties') && !_.has(nestedVal, 'items.properties')) {
-        return null;
-      }
-      return _.map(
-        nestedVal.properties || nestedVal.items.properties,
-        (thirdLevelVal, thirdLevelKey: string): OperandField => {
-          if (!['object', 'array'].includes(thirdLevelVal.type)) {
-            return {
-              path: [key, nestedKey, thirdLevelKey].join('.'),
-              displayName: _.startCase(thirdLevelKey),
-              type: thirdLevelVal.type,
-              required: _.get(valProps, 'required', []).includes(thirdLevelKey),
-              validation: null,
-              capabilities: [
-                specType.concat(key) as SpecCapability.fieldGroup,
-                specType.concat(nestedKey) as SpecCapability.fieldGroup,
-                ...capabilitiesFor(thirdLevelVal),
-              ],
-            };
-          }
-          if (!_.has(thirdLevelVal, 'properties') && !_.has(thirdLevelVal, 'items.properties')) {
-            return null;
-          }
-          return _.map(
-            thirdLevelVal.properties || thirdLevelVal.items.properties,
-            (forthLevelVal, forthLevelKey: string): OperandField => ({
-              path: [key, nestedKey, thirdLevelKey, forthLevelKey].join('.'),
-              displayName: _.startCase(forthLevelKey),
-              type: forthLevelVal.type,
-              required: _.get(nestedVal.properties, 'required', []).includes(forthLevelVal),
-              validation: null,
-              capabilities: [
-                specType.concat(key) as SpecCapability.fieldGroup,
-                specType.concat(nestedKey) as SpecCapability.fieldGroup,
-                specType.concat(thirdLevelKey) as SpecCapability.fieldGroup,
-                ...capabilitiesFor(forthLevelVal),
-              ],
-            }),
-          );
-        },
-      );
-    },
-  );
+// Returns appropriate x-descriptor for an OpenAPI spec property
+const capabilitiesFor = (property): SpecCapability[] => {
+  if (property.enum) {
+    return property.enum.map((i) => SpecCapability.select.concat(i));
+  }
+  switch (property.type) {
+    case 'integer':
+      return [SpecCapability.number];
+    case 'boolean':
+      return [SpecCapability.booleanSwitch];
+    case 'string':
+    default:
+      return [SpecCapability.text];
+  }
 };
 
-const fieldsForOpenAPI = (openAPI: SwaggerDefinition): OperandField[] => {
-  if (_.isEmpty(openAPI)) {
-    return [];
+// Recursively traverses OpenAPI spec properties and flattens all nested properties into an array of
+// operator descriptors.
+const flattenNestedProperties = ({
+  path = '',
+  fields = [],
+  groupDescriptor = '',
+  groupPath = '',
+  property,
+  name,
+  required = false,
+}): OperandField[] => {
+  // Null check
+  if (!property) {
+    return fields;
   }
 
-  const fields: OperandField[] = _.flattenDepth(
-    _.map(
-      _.get(openAPI, 'properties.spec.properties', {}),
-      (val, key: string): OperandField[] => {
-        const capabilitiesFor = (property): SpecCapability[] => {
-          if (property.enum) {
-            return property.enum.map((i) => SpecCapability.select.concat(i));
-          }
-          switch (property.type) {
-            case 'integer':
-              return [SpecCapability.number];
-            case 'boolean':
-              return [SpecCapability.booleanSwitch];
-            case 'string':
-            default:
-              return [SpecCapability.text];
-          }
-        };
-
-        switch (val.type) {
-          case 'object':
-            if (
-              _.values(val.properties).some(
-                (nestedVal) =>
-                  _.has(nestedVal, 'properties') &&
-                  _.values(nestedVal.properties).some(
-                    (thirdLevelVal) =>
-                      _.has(nestedVal, 'properties') &&
-                      _.values(thirdLevelVal.properties).some((forthLevelVal) =>
-                        ['object', 'array'].includes(forthLevelVal.type),
-                      ),
-                  ),
-              )
-            ) {
-              return null;
-            }
-
-            return operandFieldsHelper(
-              key,
-              val,
-              val.properties,
-              capabilitiesFor,
-              SpecCapability.fieldGroup,
-            );
-
-          case 'array':
-            if (
-              val.items.type !== 'object' ||
-              (_.has(val.items, 'properties') &&
-                _.values(val.items.properties).some(
-                  (nestedVal) =>
-                    _.has(nestedVal, 'properties') &&
-                    _.values(nestedVal.properties).some(
-                      (thirdLevelVal) =>
-                        _.has(thirdLevelVal, 'properties') &&
-                        _.values(thirdLevelVal.properties).some((forthLevelVal) =>
-                          ['object', 'array'].includes(forthLevelVal.type),
-                        ),
-                    ),
-                ))
-            ) {
-              return null;
-            }
-
-            return operandFieldsHelper(
-              key,
-              val.items,
-              val.items.properties,
-              capabilitiesFor,
-              SpecCapability.fieldGroup,
-            );
-
-          case undefined:
-            return null;
-          default:
-            return [
-              {
-                path: key,
-                displayName: _.startCase(key),
-                type: val.type,
-                required: _.get(openAPI.properties.spec, 'required', []).includes(key),
-                validation: _.pick(val, [...Object.keys(Validations)]),
-                capabilities: capabilitiesFor(val),
-              },
-            ];
-        }
-      },
-    ),
-    3,
-  );
-
-  return _.compact(fields);
+  switch (property.type) {
+    // If this property is of 'object' type, return a flat map of it's nested properties
+    case 'object':
+      return _.flatMap(property.properties, (nestedProperty, nestedPropertyName) => {
+        return flattenNestedProperties({
+          fields,
+          name: nestedPropertyName,
+          groupDescriptor: SpecCapability.fieldGroup,
+          groupPath: `${groupPath}.${_.startCase(name)}`,
+          path: `${path}.${name}`,
+          property: nestedProperty,
+          required: (property?.required || []).includes(nestedPropertyName),
+        });
+      });
+    // If this property of is of 'array' type, return a flat map of its nested item properties.
+    case 'array':
+      return _.flatMap(property.items.properties, (nestedProperty, nestedPropertyName) => {
+        return flattenNestedProperties({
+          fields,
+          groupDescriptor: SpecCapability.arrayFieldGroup,
+          groupPath: `${groupPath}.${_.startCase(name)}`,
+          name: nestedPropertyName,
+          path: `${path}.${name}`,
+          property: nestedProperty,
+          required: (property?.required || []).includes(nestedPropertyName),
+        });
+      });
+    // This property is not an array or object, so it can be mapped to a specific descriptor
+    default:
+      return [
+        ...fields,
+        {
+          capabilities: [
+            ...(groupDescriptor ? [`${groupDescriptor}${groupPath}`] : []),
+            ...capabilitiesFor(property),
+          ],
+          displayName: _.startCase(name),
+          path: `${path}.${name}`,
+          required,
+          type: property.type,
+          validation: _.pick(property, Object.keys(Validations)),
+        },
+      ];
+  }
 };
 
+// Returns traversal depth of an OpenAPI spec property.
+const getPropertyDepth = (property, depth = 0) => {
+  // If this property is not an array or object, we have reached the maximum depth
+  if (!property || !['array', 'object'].includes(property.type)) {
+    return depth;
+  }
+
+  // This property has nested properties. Map all nested properties to their depths.
+  const nestedDepths = _.map(
+    property?.properties || property?.items?.properties,
+    (nestedProperty) => getPropertyDepth(nestedProperty, depth + 1),
+  );
+
+  // Return the maximum depth from the nested properties
+  return Math.max(...nestedDepths);
+};
+
+// Map openAPI spec propertoes to appropriate Operator Descriptors
+const fieldsForOpenAPI = (openAPI: SwaggerDefinition, depth = MAX_DEPTH): OperandField[] =>
+  _.isEmpty(openAPI)
+    ? []
+    : _.reduce(
+        openAPI?.properties?.spec?.properties || {},
+        (acc, property, propertyName) => {
+          if (!property?.type || getPropertyDepth(property) > depth) {
+            return acc;
+          }
+          return [
+            ...acc,
+            ...flattenNestedProperties({
+              property,
+              name: propertyName,
+              required: (openAPI?.properties?.spec?.required || []).includes(propertyName),
+            }),
+          ];
+        },
+        [],
+      );
+
 export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
+  // TODO (jon) Revisit and improve the logic for mapping openAPI/providedAPI to form fields
   const fields: OperandField[] = (!_.isEmpty(
     props.clusterServiceVersion && props.providedAPI.specDescriptors,
   )
@@ -317,7 +275,6 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
           }
         : field,
     );
-
   const defaultValueFor = (field: OperandField) => {
     if (
       _.intersection(field.capabilities, [
@@ -770,9 +727,11 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
     (groups, field) =>
       checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Forth) &&
       field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
-        ? groups.add(field.capabilities.find((c) =>
-            c.startsWith(SpecCapability.fieldGroup),
-          ) as SpecCapability.fieldGroup)
+        ? groups.add(
+            field.capabilities.find((c) =>
+              c.startsWith(SpecCapability.fieldGroup),
+            ) as SpecCapability.fieldGroup,
+          )
         : groups,
     new Set<SpecCapability.fieldGroup>(),
   );
@@ -800,9 +759,11 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
     (groups, field) =>
       checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Third) &&
       field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
-        ? groups.add(field.capabilities.find((c) =>
-            c.startsWith(SpecCapability.fieldGroup),
-          ) as SpecCapability.fieldGroup)
+        ? groups.add(
+            field.capabilities.find((c) =>
+              c.startsWith(SpecCapability.fieldGroup),
+            ) as SpecCapability.fieldGroup,
+          )
         : groups,
     new Set<SpecCapability.fieldGroup>(),
   );
@@ -1358,7 +1319,6 @@ export const CreateOperand: React.FC<CreateOperandProps> = (props) => {
     </>
   );
 };
-
 
 const FieldList: React.FC<FieldListProps> = (props) => {
   const { fieldList, inputFor, formErrors } = props;
