@@ -101,89 +101,163 @@ const fieldsFor = (providedAPI: CRDDescription) =>
     capabilities: desc['x-descriptors'],
   })) as OperandField[];
 
+
+const operandFieldsHelper = (key, val, valProps, capabilitiesFor, specType) => {
+  return _.map(
+    valProps,
+    (nestedVal, nestedKey: string): OperandField => {
+      if (!['object', 'array'].includes(nestedVal.type)) {
+        return {
+          path: [key, nestedKey].join('.'),
+          displayName: _.startCase(nestedKey),
+          type: nestedVal.type,
+          required: _.get(val, 'required', []).includes(nestedKey),
+          validation: null,
+          capabilities: [
+            specType.concat(key) as SpecCapability.fieldGroup,
+            ...capabilitiesFor(nestedVal.type),
+          ],
+        };
+      }
+      if (!_.has(nestedVal, 'properties') && !_.has(nestedVal, 'items.properties')) {
+        return null;
+      }
+      return _.map(
+        nestedVal.properties || nestedVal.items.properties,
+        (thirdLevelVal, thirdLevelKey: string): OperandField => {
+          if (!['object', 'array'].includes(thirdLevelVal.type)) {
+            return {
+              path: [key, nestedKey, thirdLevelKey].join('.'),
+              displayName: _.startCase(thirdLevelKey),
+              type: thirdLevelVal.type,
+              required: _.get(valProps, 'required', []).includes(thirdLevelKey),
+              validation: null,
+              capabilities: [
+                specType.concat(key) as SpecCapability.fieldGroup,
+                specType.concat(nestedKey) as SpecCapability.fieldGroup,
+                ...capabilitiesFor(thirdLevelVal),
+              ],
+            };
+          }
+          if (!_.has(thirdLevelVal, 'properties') && !_.has(thirdLevelVal, 'items.properties')) {
+            return null;
+          }
+          return _.map(
+            thirdLevelVal.properties || thirdLevelVal.items.properties,
+            (forthLevelVal, forthLevelKey: string): OperandField => ({
+              path: [key, nestedKey, thirdLevelKey, forthLevelKey].join('.'),
+              displayName: _.startCase(forthLevelKey),
+              type: forthLevelVal.type,
+              required: _.get(nestedVal.properties, 'required', []).includes(forthLevelVal),
+              validation: null,
+              capabilities: [
+                specType.concat(key) as SpecCapability.fieldGroup,
+                specType.concat(nestedKey) as SpecCapability.fieldGroup,
+                specType.concat(thirdLevelKey) as SpecCapability.fieldGroup,
+                ...capabilitiesFor(forthLevelVal),
+              ],
+            }),
+          );
+        },
+      );
+    },
+  );
+};
+
 const fieldsForOpenAPI = (openAPI: SwaggerDefinition): OperandField[] => {
   if (_.isEmpty(openAPI)) {
     return [];
   }
 
-  const fields: OperandField[] = _.flatten(
-    _.map(_.get(openAPI, 'properties.spec.properties', {}), (val, key: string): OperandField[] => {
-      const capabilitiesFor = (property): SpecCapability[] => {
-        if (property.enum) {
-          return property.enum.map((i) => SpecCapability.select.concat(i));
-        }
-        switch (property.type) {
-          case 'integer':
-            return [SpecCapability.number];
-          case 'boolean':
-            return [SpecCapability.booleanSwitch];
-          case 'string':
-          default:
-            return [SpecCapability.text];
-        }
-      };
+  const fields: OperandField[] = _.flattenDepth(
+    _.map(
+      _.get(openAPI, 'properties.spec.properties', {}),
+      (val, key: string): OperandField[] => {
+        const capabilitiesFor = (property): SpecCapability[] => {
+          if (property.enum) {
+            return property.enum.map((i) => SpecCapability.select.concat(i));
+          }
+          switch (property.type) {
+            case 'integer':
+              return [SpecCapability.number];
+            case 'boolean':
+              return [SpecCapability.booleanSwitch];
+            case 'string':
+            default:
+              return [SpecCapability.text];
+          }
+        };
 
-      switch (val.type) {
-        case 'object':
-          if (
-            _.values(val.properties).some((nestedVal) =>
-              ['object', 'array'].includes(nestedVal.type),
-            )
-          ) {
+        switch (val.type) {
+          case 'object':
+            if (
+              _.values(val.properties).some(
+                (nestedVal) =>
+                  _.has(nestedVal, 'properties') &&
+                  _.values(nestedVal.properties).some(
+                    (thirdLevelVal) =>
+                      _.has(nestedVal, 'properties') &&
+                      _.values(thirdLevelVal.properties).some((forthLevelVal) =>
+                        ['object', 'array'].includes(forthLevelVal.type),
+                      ),
+                  ),
+              )
+            ) {
+              return null;
+            }
+
+            return operandFieldsHelper(
+              key,
+              val,
+              val.properties,
+              capabilitiesFor,
+              SpecCapability.fieldGroup,
+            );
+
+          case 'array':
+            if (
+              val.items.type !== 'object' ||
+              (_.has(val.items, 'properties') &&
+                _.values(val.items.properties).some(
+                  (nestedVal) =>
+                    _.has(nestedVal, 'properties') &&
+                    _.values(nestedVal.properties).some(
+                      (thirdLevelVal) =>
+                        _.has(thirdLevelVal, 'properties') &&
+                        _.values(thirdLevelVal.properties).some((forthLevelVal) =>
+                          ['object', 'array'].includes(forthLevelVal.type),
+                        ),
+                    ),
+                ))
+            ) {
+              return null;
+            }
+
+            return operandFieldsHelper(
+              key,
+              val.items,
+              val.items.properties,
+              capabilitiesFor,
+              SpecCapability.fieldGroup,
+            );
+
+          case undefined:
             return null;
-          }
-          return _.map(
-            val.properties,
-            (nestedVal, nestedKey: string): OperandField => ({
-              path: [key, nestedKey].join('.'),
-              displayName: _.startCase(nestedKey),
-              type: nestedVal.type,
-              required: _.get(val, 'required', []).includes(nestedKey),
-              validation: null,
-              capabilities: [
-                SpecCapability.fieldGroup.concat(key) as SpecCapability.fieldGroup,
-                ...capabilitiesFor(nestedVal),
-              ],
-            }),
-          );
-        case 'array':
-          if (
-            val.items.type !== 'object' ||
-            _.values(val.items.properties).some((itemVal) =>
-              ['object', 'array'].includes(itemVal.type),
-            )
-          ) {
-            return null;
-          }
-          return _.map(
-            val.items.properties,
-            (itemVal, itemKey: string): OperandField => ({
-              path: `${key}[0].${itemKey}`,
-              displayName: _.startCase(itemKey),
-              type: itemVal.type,
-              required: _.get(val.items, 'required', []).includes(itemKey),
-              validation: null,
-              capabilities: [
-                SpecCapability.arrayFieldGroup.concat(key) as SpecCapability.fieldGroup,
-                ...capabilitiesFor(itemVal),
-              ],
-            }),
-          );
-        case undefined:
-          return null;
-        default:
-          return [
-            {
-              path: key,
-              displayName: _.startCase(key),
-              type: val.type,
-              required: _.get(openAPI.properties.spec, 'required', []).includes(key),
-              validation: _.pick(val, [...Object.keys(Validations)]),
-              capabilities: capabilitiesFor(val),
-            },
-          ];
-      }
-    }),
+          default:
+            return [
+              {
+                path: key,
+                displayName: _.startCase(key),
+                type: val.type,
+                required: _.get(openAPI.properties.spec, 'required', []).includes(key),
+                validation: _.pick(val, [...Object.keys(Validations)]),
+                capabilities: capabilitiesFor(val),
+              },
+            ];
+        }
+      },
+    ),
+    3,
   );
 
   return _.compact(fields);
@@ -656,6 +730,12 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
     return null;
   };
 
+  enum FormGroupLevels {
+    Second = 2,
+    Third = 3,
+    Forth = 4,
+  }
+
   const getGroupName = (group, groupType) => {
     if (!_.isString(group) || !_.isString(groupType)) {
       return null;
@@ -663,8 +743,87 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
     return _.startCase(group.split(groupType)[1]);
   };
 
+  const getSubGroupName = (group, subGroup, groupType) => {
+    return fields.find(
+      (f) =>
+        f.capabilities.includes(group) &&
+        f.capabilities.includes(subGroup) &&
+        f.capabilities[1] === subGroup,
+    )
+      ? _.startCase(subGroup.split(groupType)[1])
+      : null;
+  };
+  const getNextSubGroupName = (group, subGroup, nextSubGroup, groupType) => {
+    return fields.find(
+      (f) =>
+        f.capabilities.includes(group) &&
+        f.capabilities.includes(subGroup) &&
+        f.capabilities.includes(nextSubGroup) &&
+        f.capabilities[2] === nextSubGroup,
+    )
+      ? _.startCase(nextSubGroup.split(groupType)[1])
+      : null;
+  };
+  const checkFormGroupLevelPath = (fieldCap, formGroupLevel) => _.size(fieldCap) === formGroupLevel;
+
+  const fieldGroupsForthLevel = fields.reduce(
+    (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Forth) &&
+      field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
+        ? groups.add(field.capabilities.find((c) =>
+            c.startsWith(SpecCapability.fieldGroup),
+          ) as SpecCapability.fieldGroup)
+        : groups,
+    new Set<SpecCapability.fieldGroup>(),
+  );
+
+  const fieldGroupsForthLevelSub = fields.reduce(
+    (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Forth) ||
+      (_.size(field.capabilities) === FormGroupLevels.Third &&
+        field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup)))
+        ? groups.add(_.nth(field.capabilities, 1) as SpecCapability.fieldGroup)
+        : groups,
+    new Set<SpecCapability.fieldGroup>(),
+  );
+
+  const fieldGroupsForthLevelSubNext = fields.reduce(
+    (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Forth) &&
+      field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
+        ? groups.add(_.nth(field.capabilities, 2) as SpecCapability.fieldGroup)
+        : groups,
+    new Set<SpecCapability.fieldGroup>(),
+  );
+
+  const fieldGroupsThirdLevelInitial = fields.reduce(
+    (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Third) &&
+      field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
+        ? groups.add(field.capabilities.find((c) =>
+            c.startsWith(SpecCapability.fieldGroup),
+          ) as SpecCapability.fieldGroup)
+        : groups,
+    new Set<SpecCapability.fieldGroup>(),
+  );
+  //  Todo:
+  const fieldGroupsThirdLevel = _.pullAll(
+    [...fieldGroupsThirdLevelInitial],
+    [...fieldGroupsForthLevel],
+  );
+
+  const fieldGroupsThirdLevelSub = fields.reduce(
+    (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Third) &&
+      field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
+        ? groups.add(_.nth(field.capabilities, 1) as SpecCapability.fieldGroup)
+        : groups,
+    new Set<SpecCapability.fieldGroup>(),
+  );
+
   const fieldGroups = fields.reduce(
     (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Second) &&
       field.capabilities.find((c) => c.startsWith(SpecCapability.fieldGroup))
         ? groups.add(
             field.capabilities.find((c) =>
@@ -677,6 +836,7 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
 
   const arrayFieldGroups = fields.reduce(
     (groups, field) =>
+      checkFormGroupLevelPath(field.capabilities, FormGroupLevels.Second) &&
       field.capabilities.find((c) => c.startsWith(SpecCapability.arrayFieldGroup))
         ? groups.add(
             field.capabilities.find((c) =>
@@ -730,6 +890,191 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
                 tags={formValues['metadata.labels']}
               />
             </div>
+
+            {[...fieldGroupsForthLevel].map((group) => {
+              const groupName = getGroupName(group, SpecCapability.fieldGroup);
+              const fieldList = fields
+                .filter(
+                  (f) =>
+                    checkFormGroupLevelPath(f.capabilities, FormGroupLevels.Second) &&
+                    f.capabilities.find((c) => c.startsWith(group)),
+                )
+                .filter((f) => !_.isNil(inputFor(f)));
+
+              return (
+                <div id={group} key={group}>
+                  <FieldGroup
+                    defaultExpand={
+                      !_.some(
+                        fieldList,
+                        (f) => f.capabilities.includes(SpecCapability.advanced) && !f.required,
+                      )
+                    }
+                    groupName={groupName}
+                  >
+                    {[...fieldGroupsForthLevelSub].map((subGroup) => {
+                      const subGroupName = getSubGroupName(
+                        group,
+                        subGroup,
+                        SpecCapability.fieldGroup,
+                      );
+
+                      const fieldListNest = fields
+                        .filter(
+                          (f) =>
+                            checkFormGroupLevelPath(f.capabilities, FormGroupLevels.Third) &&
+                            f.capabilities.includes(group) &&
+                            f.capabilities.includes(subGroup) &&
+                            f.capabilities[1] === subGroup,
+                        )
+                        .filter((f) => !_.isNil(inputFor(f)));
+
+                      return (
+                        <div id={subGroup} key={subGroup}>
+                          {!_.isEmpty(fieldListNest && subGroupName) && (
+                            <FieldGroup
+                              defaultExpand={
+                                !_.some(
+                                  fieldListNest,
+                                  (f) =>
+                                    f.capabilities.includes(SpecCapability.advanced) && !f.required,
+                                )
+                              }
+                              groupName={subGroupName}
+                            >
+                              {[...fieldGroupsForthLevelSubNext].map((nextSubGroup) => {
+                                const nextSubGroupName = getNextSubGroupName(
+                                  group,
+                                  subGroup,
+                                  nextSubGroup,
+                                  SpecCapability.fieldGroup,
+                                );
+
+                                const fieldListbNested = fields
+                                  .filter(
+                                    (f) =>
+                                      checkFormGroupLevelPath(
+                                        f.capabilities,
+                                        FormGroupLevels.Forth,
+                                      ) &&
+                                      f.capabilities.includes(group) &&
+                                      f.capabilities.includes(subGroup) &&
+                                      f.capabilities.includes(nextSubGroup),
+                                  )
+                                  .filter((f) => !_.isNil(inputFor(f)));
+
+                                return (
+                                  <div id={nextSubGroup} key={nextSubGroup}>
+                                    {!_.isEmpty(fieldListbNested && nextSubGroupName) && (
+                                      <FieldGroup
+                                        defaultExpand={
+                                          !_.some(
+                                            fieldListbNested,
+                                            (f) =>
+                                              f.capabilities.includes(SpecCapability.advanced) &&
+                                              !f.required,
+                                          )
+                                        }
+                                        groupName={nextSubGroupName}
+                                      >
+                                        <FieldList
+                                          fieldList={fieldListbNested}
+                                          inputFor={inputFor}
+                                          formErrors={formErrors}
+                                        />
+                                      </FieldGroup>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <FieldList
+                                fieldList={fieldListNest}
+                                inputFor={inputFor}
+                                formErrors={formErrors}
+                              />
+                            </FieldGroup>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <FieldList fieldList={fieldList} inputFor={inputFor} formErrors={formErrors} />
+                  </FieldGroup>
+                </div>
+              );
+            })}
+
+            {[...fieldGroupsThirdLevel].map((group) => {
+              const groupName = getGroupName(group, SpecCapability.fieldGroup);
+
+              const fieldList = fields
+                .filter(
+                  (f) =>
+                    checkFormGroupLevelPath(f.capabilities, FormGroupLevels.Second) &&
+                    f.capabilities.find((c) => c.startsWith(group)),
+                )
+                .filter((f) => !_.isNil(inputFor(f)));
+
+              return (
+                !_.isEmpty(fieldGroupsThirdLevelSub) && (
+                  <div id={group} key={group}>
+                    <FieldGroup
+                      defaultExpand={
+                        !_.some(
+                          fieldList,
+                          (f) => f.capabilities.includes(SpecCapability.advanced) && !f.required,
+                        )
+                      }
+                      groupName={groupName}
+                    >
+                      {[...fieldGroupsThirdLevelSub].map((subGroup) => {
+                        const subGroupName = getSubGroupName(
+                          group,
+                          subGroup,
+                          SpecCapability.fieldGroup,
+                        );
+
+                        const fieldListSub = _.cloneDeep(fields)
+                          .filter(
+                            (f) =>
+                              f.capabilities.includes(group) && f.capabilities.includes(subGroup),
+                          )
+                          .filter((f) => !_.isNil(inputFor(f)));
+
+                        return (
+                          !_.isEmpty(fieldGroupsThirdLevelSub && subGroupName) && (
+                            <div id={subGroup} key={subGroup}>
+                              <FieldGroup
+                                defaultExpand={
+                                  !_.some(
+                                    fieldListSub,
+                                    (f) =>
+                                      f.capabilities.includes(SpecCapability.advanced) &&
+                                      !f.required,
+                                  )
+                                }
+                                groupName={subGroupName}
+                              >
+                                <FieldList
+                                  fieldList={fieldListSub}
+                                  inputFor={inputFor}
+                                  formErrors={formErrors}
+                                />
+                              </FieldGroup>
+                            </div>
+                          )
+                        );
+                      })}
+                      <FieldList
+                        fieldList={fieldList}
+                        inputFor={inputFor}
+                        formErrors={formErrors}
+                      />
+                    </FieldGroup>
+                  </div>
+                )
+              );
+            })}
+
             {[...arrayFieldGroups].map((group) => {
               const groupName = getGroupName(group, SpecCapability.arrayFieldGroup);
               const fieldList = fields
@@ -748,29 +1093,11 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
                       }
                       groupName={groupName}
                     >
-                      {fieldList.map((field) => (
-                        <div key={field.path}>
-                          <div className="form-group co-create-operand__form-group">
-                            <label
-                              className={classNames('form-label', {
-                                'co-required': field.required,
-                              })}
-                              htmlFor={field.path}
-                            >
-                              {field.displayName}
-                            </label>
-                            {inputFor(field)}
-                            {field.description && (
-                              <span id={`${field.path}__description`} className="help-block">
-                                {field.description}
-                              </span>
-                            )}
-                            {formErrors[field.path] && (
-                              <span className="co-error">{formErrors[field.path]}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                      <FieldList
+                        fieldList={fieldList}
+                        inputFor={inputFor}
+                        formErrors={formErrors}
+                      />
                     </FieldGroup>
                   </div>
                 )
@@ -778,7 +1105,10 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
             })}
             {[...fieldGroups].map((group) => {
               const groupName = getGroupName(group, SpecCapability.fieldGroup);
-              const fieldList = fields
+              const fieldList = _.cloneDeep(fields)
+                .filter((f) =>
+                  _.pullAll(f.capabilities, [...fieldGroupsThirdLevel, ...fieldGroupsForthLevel]),
+                )
                 .filter((f) => f.capabilities.includes(group))
                 .filter((f) => !_.isNil(inputFor(f)));
 
@@ -794,29 +1124,11 @@ export const CreateOperandForm: React.FC<CreateOperandFormProps> = (props) => {
                       }
                       groupName={groupName}
                     >
-                      {fieldList.map((field) => (
-                        <div key={field.path}>
-                          <div className="form-group co-create-operand__form-group">
-                            <label
-                              className={classNames('form-label', {
-                                'co-required': field.required,
-                              })}
-                              htmlFor={field.path}
-                            >
-                              {field.displayName}
-                            </label>
-                            {inputFor(field)}
-                            {field.description && (
-                              <span id={`${field.path}__description`} className="help-block">
-                                {field.description}
-                              </span>
-                            )}
-                            {formErrors[field.path] && (
-                              <span className="co-error">{formErrors[field.path]}</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                      <FieldList
+                        fieldList={fieldList}
+                        inputFor={inputFor}
+                        formErrors={formErrors}
+                      />
                     </FieldGroup>
                   </div>
                 )
@@ -1045,6 +1357,45 @@ export const CreateOperand: React.FC<CreateOperandProps> = (props) => {
       </StatusBox>
     </>
   );
+};
+
+
+const FieldList: React.FC<FieldListProps> = (props) => {
+  const { fieldList, inputFor, formErrors } = props;
+
+  return (
+    <>
+      {fieldList.map((field) => (
+        <div key={field.path}>
+          <div className="form-group co-create-operand__form-group">
+            <label
+              className={classNames('form-label', {
+                'co-required': field.required,
+              })}
+              htmlFor={field.path}
+            >
+              {field.displayName}
+            </label>
+            {inputFor(field)}
+            {field.description && (
+              <span id={`${field.path}__description`} className="help-block">
+                {field.description}
+              </span>
+            )}
+            {formErrors[field.path] && <span className="co-error">{formErrors[field.path]}</span>}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+};
+
+FieldList.displayName = 'FieldList';
+
+type FieldListProps = {
+  fieldList: OperandField[];
+  inputFor: (field: OperandField) => void;
+  formErrors: FieldErrors;
 };
 
 const stateToProps = ({ k8s }: RootState, props: Omit<CreateOperandPageProps, 'operandModel'>) => ({
