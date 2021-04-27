@@ -100,12 +100,7 @@ export const tableFilters: TableFilterMap = {
   'role-binding-roleRef-kind': (kind: string, binding) => binding.roleRef.kind === kind,
 
   // Filter role bindings by user name
-  'role-binding-user': (userName, binding) =>
-    _.some(binding.subjects, {
-      kind: 'User',
-      apiGroup: 'rbac.authorization.k8s.io',
-      name: userName,
-    }),
+  'role-binding-user': (userName, { subject }) => subject.name === userName,
 
   // Filter role bindings by group name
   'role-binding-group': (groupName, binding) =>
