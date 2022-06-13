@@ -6,7 +6,6 @@ import { useK8sWatchResource } from '@console/internal/components/utils/k8s-watc
 import { K8sPodControllerKind, getGroupVersionKind } from '@console/internal/module/k8s';
 import { SyncedEditor } from '@console/shared/src/components/synced-editor';
 import { EditorType } from '@console/shared/src/components/synced-editor/editor-toggle';
-import { safeJSToYAML } from '@console/shared/src/utils/yaml';
 import { PodDisruptionBudgetModel } from '../../models';
 import { pdbToK8sResource } from './pdb-models';
 import PDBForm from './PDBForm';
@@ -66,7 +65,6 @@ export const PDBFormPage: React.FC<{
     selector: { matchLabels: resource?.spec?.template?.metadata?.labels } || {},
   };
   const [helpText, setHelpText] = React.useState(formHelpText);
-  const k8sObj = pdbToK8sResource(initialPDB);
 
   const YAMLEditor: React.FC<YAMLEditorProps> = ({ onChange, initialYAML = '' }) => {
     return (
@@ -74,12 +72,7 @@ export const PDBFormPage: React.FC<{
         hideHeader
         match={match}
         onChange={onChange}
-        template={
-          initialYAML ||
-          safeJSToYAML(existingResource, 'yamlData', {
-            skipInvalid: true,
-          })
-        }
+        template={initialYAML}
         isCreate={!existingResource}
       />
     );
@@ -109,7 +102,7 @@ export const PDBFormPage: React.FC<{
               yamlContext: {},
             }}
             FormEditor={PDBForm}
-            initialData={existingResource || k8sObj}
+            initialData={existingResource || pdbToK8sResource(initialPDB)}
             initialType={EditorType.Form}
             onChangeEditorType={(type) =>
               setHelpText(type === EditorType.Form ? formHelpText : yamlHelpText)
