@@ -241,7 +241,6 @@ export const OperandTableRow: React.FC<OperandTableRowProps> = ({ obj, showNames
     objReference,
     actionExtensions,
   ]);
-
   return (
     <>
       <TableData className={tableColumnClasses[0]}>
@@ -395,7 +394,6 @@ const getK8sWatchResources = (
   return providedAPIs.reduce((resourceAccumulator, api) => {
     const reference = referenceForProvidedAPI(api);
     const model = models?.[reference];
-
     if (!model) {
       return resourceAccumulator;
     }
@@ -448,7 +446,6 @@ export const ProvidedAPIsPage = (props: ProvidedAPIsPageProps) => {
   const hasNamespacedAPI = providedAPIs.some((api) => {
     const reference = referenceForProvidedAPI(api);
     const model = models[reference];
-
     return model?.namespaced;
   });
 
@@ -538,7 +535,6 @@ export const ProvidedAPIsPage = (props: ProvidedAPIsPageProps) => {
         />
         <OperandList
           data={filteredData}
-          csv={obj}
           loaded={loaded}
           loadError={loadErrors}
           noAPIsFound={Object.keys(watchedResources).length === 0}
@@ -589,7 +585,6 @@ export const ProvidedAPIPage: React.FC<ProvidedAPIPageProps> = (props) => {
         }
       : {},
   );
-
   const [staticData, filteredData, onFilterChange] = useListPageFilter(resources);
 
   return inFlight ? null : (
@@ -601,7 +596,7 @@ export const ProvidedAPIPage: React.FC<ProvidedAPIPageProps> = (props) => {
           </div>
         )}
         <ListPageCreateLink to={createPath}>
-          {t('public~Create {{label}}', { label: model.label })}
+          {t('public~Create {{label}}', { label })}
         </ListPageCreateLink>
       </ListPageHeader>
       <ListPageBody>
@@ -615,7 +610,6 @@ export const ProvidedAPIPage: React.FC<ProvidedAPIPageProps> = (props) => {
         />
         <OperandList
           data={filteredData}
-          csv={csv}
           loaded={loaded}
           loadError={loadError}
           showNamespace={listAllNamespaces}
@@ -862,7 +856,6 @@ export type OperandListProps = {
   reduxIDs?: string[];
   rowSplitter?: any;
   staticFilters?: any;
-  csv?: ClusterServiceVersionKind;
   loadError?: string;
   noAPIsFound?: boolean;
   showNamespace?: boolean;
@@ -940,7 +933,6 @@ type Header = {
 };
 
 export type OperandTableRowProps = RowFunctionArgs<K8sResourceKind> & {
-  csv?: ClusterServiceVersionKind;
   showNamespace?: boolean;
 };
 
