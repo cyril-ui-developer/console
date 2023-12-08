@@ -38,7 +38,6 @@ import {
   DownloadIcon,
   OutlinedWindowRestoreIcon,
   OutlinedPlayCircleIcon,
-  ExternalLinkAltIcon,
 } from '@patternfly/react-icons';
 import * as classNames from 'classnames';
 import {
@@ -297,36 +296,37 @@ export const LogControls: React.FC<LogControlsProps> = ({
         resourceNamespaceUID: namespaceUID,
         podLabels: JSON.stringify(resource.metadata.labels),
       });
-      return (
+
+      return isMobile ? (
+        <DropdownItemDeprecated
+          component={
+            <a // must be an anchor element in order for tabbing to work
+              className="co-external-link"
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-test-id={link.metadata.name}
+            >
+              {link.spec.text}
+            </a>
+          }
+          key={link.metadata.uid}
+        />
+      ) : (
         <React.Fragment key={link.metadata.uid}>
-          {isMobile ? (
-            <DropdownItemDeprecated
-              component={
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  {link.spec.text}
-                  <span className="co-icon-nowrap">
-                    {' '}
-                    <ExternalLinkAltIcon />
-                  </span>
-                </a>
-              }
-            />
-          ) : (
-            <>
-              <ExternalLink href={url} text={link.spec.text} dataTestID={link.metadata.name} />
-              <Divider
-                orientation={{
-                  default: 'vertical',
-                }}
-              />
-            </>
-          )}
+          <ExternalLink href={url} text={link.spec.text} dataTestID={link.metadata.name} />
+          <Divider
+            orientation={{
+              default: 'vertical',
+            }}
+          />
         </React.Fragment>
       );
     });
 
   const label = t('public~Debug container');
-  const renderLogViewerSearch = () => (
+
+  const logViewerSearch = (
     <LogViewerSearch
       onFocus={() => {
         if (status === STREAM_ACTIVE) {
@@ -337,7 +337,8 @@ export const LogControls: React.FC<LogControlsProps> = ({
       minSearchChars={0}
     />
   );
-  const renderShowDebugAction = () => (
+
+  const debugAction = (
     <>
       {!isWindowsPod(resource) && (
         <Link
@@ -361,7 +362,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
     </>
   );
 
-  const renderShowFullLog = () => (
+  const fullLog = (
     <div>
       <Tooltip
         content={t('public~Select to view the entire log. Default view is the last 1,000 lines.')}
@@ -380,7 +381,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
     </div>
   );
 
-  const renderWrapLines = () => (
+  const wrapLines = (
     <Checkbox
       label={t('public~Wrap lines')}
       id="wrapLogLines"
@@ -392,66 +393,77 @@ export const LogControls: React.FC<LogControlsProps> = ({
     />
   );
 
+  const raw = (
+    <>
+      <OutlinedWindowRestoreIcon className="co-icon-space-r" />
+      {t('public~Raw')}
+    </>
+  );
+
+  const download = (
+    <>
+      <DownloadIcon className="co-icon-space-r" />
+      {t('public~Download')}
+    </>
+  );
+
+  const fullscreen = isFullscreen ? (
+    <>
+      <CompressIcon className="co-icon-space-r" />
+      {t('public~Collapse')}
+    </>
+  ) : (
+    <>
+      <ExpandIcon className="co-icon-space-r" />
+      {t('public~Expand')}
+    </>
+  );
+
   const dropdownItems = [
-    <DropdownGroupDeprecated key="log actions" label={t('public~Log actions')} />,
-    <React.Fragment key="pod log links">
+    <DropdownGroupDeprecated key="log actions" label={t('public~Log actions')}>
       {!_.isEmpty(podLogLinks) && renderPodLogLinks()}
-    </React.Fragment>,
-    <DropdownItemDeprecated
-      key="show full log"
-      component="button"
-      onClick={(e) => {
-        e.preventDefault();
-        toggleShowFullLog(!isWrapLines);
-      }}
-    >
-      {renderShowFullLog()}
-    </DropdownItemDeprecated>,
-    <DropdownItemDeprecated
-      key="wrap lines"
-      component="button"
-      onClick={(e) => {
-        e.preventDefault();
-        toggleWrapLines(!isWrapLines);
-      }}
-    >
-      {renderWrapLines()}
-    </DropdownItemDeprecated>,
-    <DropdownItemDeprecated
-      key="raw"
-      component={
-        <a href={currentLogURL} target="_blank" rel="noopener noreferrer">
-          <OutlinedWindowRestoreIcon className="co-icon-space-r" />
-          {t('public~Raw')}
-        </a>
-      }
-    />,
-    <DropdownItemDeprecated
-      key="download"
-      component={
-        <a href={currentLogURL} download={`${resource.metadata.name}-${containerName}.log`}>
-          <DownloadIcon className="co-icon-space-r" />
-          {t('public~Download')}
-        </a>
-      }
-    />,
-    <React.Fragment key="collapse and expand">
+      <DropdownItemDeprecated
+        key="show full log"
+        component="button"
+        onClick={(e) => {
+          e.preventDefault();
+          toggleShowFullLog(!isWrapLines);
+        }}
+      >
+        {fullLog}
+      </DropdownItemDeprecated>
+      <DropdownItemDeprecated
+        key="wrap lines"
+        component="button"
+        onClick={(e) => {
+          e.preventDefault();
+          toggleWrapLines(!isWrapLines);
+        }}
+      >
+        {wrapLines}
+      </DropdownItemDeprecated>
+      <DropdownItemDeprecated
+        key="raw"
+        component={
+          <a href={currentLogURL} target="_blank" rel="noopener noreferrer">
+            {raw}
+          </a>
+        }
+      />
+      <DropdownItemDeprecated
+        key="download"
+        component={
+          <a href={currentLogURL} download={`${resource.metadata.name}-${containerName}.log`}>
+            {download}
+          </a>
+        }
+      />
       {screenfull.enabled && (
         <DropdownItemDeprecated key="collapse" onClick={toggleFullscreen}>
-          {isFullscreen ? (
-            <>
-              <CompressIcon className="co-icon-space-r" />
-              {t('public~Collapse')}
-            </>
-          ) : (
-            <>
-              <ExpandIcon className="co-icon-space-r" />
-              {t('public~Expand')}
-            </>
-          )}
+          {fullscreen}
         </DropdownItemDeprecated>
       )}
-    </React.Fragment>,
+    </DropdownGroupDeprecated>,
   ];
 
   return (
@@ -473,6 +485,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
                   position="right"
                   isPlain
                   dropdownItems={dropdownItems}
+                  isGrouped
                 />
               </ToolbarItem>
             </ToolbarGroup>
@@ -491,9 +504,9 @@ export const LogControls: React.FC<LogControlsProps> = ({
                 <StackItem>
                   <ToolbarItem>
                     <Split hasGutter>
-                      <SplitItem isFilled> {renderLogViewerSearch()} </SplitItem>
+                      <SplitItem isFilled>{logViewerSearch}</SplitItem>
                       {showDebugAction(resource, containerName) && (
-                        <SplitItem isFilled> {renderShowDebugAction()} </SplitItem>
+                        <SplitItem isFilled>{debugAction}</SplitItem>
                       )}
                     </Split>
                   </ToolbarItem>
@@ -508,9 +521,9 @@ export const LogControls: React.FC<LogControlsProps> = ({
             <div className="co-toolbar__item">{showStatus()}</div>
             {dropdown && <div className="co-toolbar__item">{dropdown}</div>}
             <div className="co-toolbar__item">{logTypeSelect(!hasPreviousLog)}</div>
-            <div className="co-toolbar__item">{renderLogViewerSearch()}</div>
+            <div className="co-toolbar__item">{logViewerSearch}</div>
             {showDebugAction(resource, containerName) && (
-              <div className="co-toolbar__item">{renderShowDebugAction()}</div>
+              <div className="co-toolbar__item">{debugAction}</div>
             )}
           </div>
           <div
@@ -519,21 +532,20 @@ export const LogControls: React.FC<LogControlsProps> = ({
           >
             <div className="pf-v5-l-flex">
               {!_.isEmpty(podLogLinks) && renderPodLogLinks()}
-              <div>{renderShowFullLog()}</div>
+              <div>{fullLog}</div>
               <Divider
                 orientation={{
                   default: 'vertical',
                 }}
               />
-              {renderWrapLines()}
+              {wrapLines}
               <Divider
                 orientation={{
                   default: 'vertical',
                 }}
               />
               <a href={currentLogURL} target="_blank" rel="noopener noreferrer">
-                <OutlinedWindowRestoreIcon className="co-icon-space-r" />
-                {t('public~Raw')}
+                {raw}
               </a>
               <Divider
                 orientation={{
@@ -541,8 +553,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
                 }}
               />
               <a href={currentLogURL} download={`${resource.metadata.name}-${containerName}.log`}>
-                <DownloadIcon className="co-icon-space-r" />
-                {t('public~Download')}
+                {download}
               </a>
               {screenfull.enabled && (
                 <>
@@ -552,17 +563,7 @@ export const LogControls: React.FC<LogControlsProps> = ({
                     }}
                   />
                   <Button variant="link" isInline onClick={toggleFullscreen}>
-                    {isFullscreen ? (
-                      <>
-                        <CompressIcon className="co-icon-space-r" />
-                        {t('public~Collapse')}
-                      </>
-                    ) : (
-                      <>
-                        <ExpandIcon className="co-icon-space-r" />
-                        {t('public~Expand')}
-                      </>
-                    )}
+                    {fullscreen}
                   </Button>
                 </>
               )}
@@ -736,7 +737,7 @@ export const ResourceLog: React.FC<ResourceLogProps> = ({
       .onerror(onError)
       .onmessage(onMessage)
       .onopen(onOpen);
-  }, [watchURL, subprotocols]);
+  }, [watchURL, subprotocols, buffer]);
   // Restart websocket if startWebSocket function changes
   React.useEffect(() => {
     if (

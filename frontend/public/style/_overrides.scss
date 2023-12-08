@@ -188,6 +188,12 @@ form.pf-v5-c-form {
   --pf-v5-c-data-list__item--BackgroundColor: transparent;
 }
 
+// ask sgoodwin for advice
+.pf-v5-c-dropdown__group > ul {
+  list-style: none;
+  padding-left: 0;
+}
+
 // PF components that calculate their correct height based on --pf-v5-global--FontSize--md: 1rem
 .pf-v5-c-modal-box,
 .pf-v5-c-switch {
