@@ -38,6 +38,7 @@ import {
   DownloadIcon,
   OutlinedWindowRestoreIcon,
   OutlinedPlayCircleIcon,
+  ExternalLinkAltIcon,
 } from '@patternfly/react-icons';
 import * as classNames from 'classnames';
 import {
@@ -299,9 +300,17 @@ export const LogControls: React.FC<LogControlsProps> = ({
       return (
         <React.Fragment key={link.metadata.uid}>
           {isMobile ? (
-            <DropdownItemDeprecated component="button">
-              <ExternalLink href={url} text={link.spec.text} dataTestID={link.metadata.name} />
-            </DropdownItemDeprecated>
+            <DropdownItemDeprecated
+              component={
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                  {link.spec.text}
+                  <span className="co-icon-nowrap">
+                    {' '}
+                    <ExternalLinkAltIcon />
+                  </span>
+                </a>
+              }
+            />
           ) : (
             <>
               <ExternalLink href={url} text={link.spec.text} dataTestID={link.metadata.name} />
