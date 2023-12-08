@@ -12,28 +12,23 @@ import {
   Button,
   Checkbox,
   Divider,
+  Dropdown,
+  DropdownItem,
+  DropdownGroup,
   Tooltip,
-  ToolbarItem,
-  ToolbarGroup,
-  Split,
-  SplitItem,
-  Toolbar,
-  ToolbarContent,
-  Stack,
-  StackItem,
+  MenuToggleElement,
+  MenuToggle,
+  DropdownList,
 } from '@patternfly/react-core';
 import {
   Select as SelectDeprecated,
   SelectOption as SelectOptionDeprecated,
   SelectVariant as SelectVariantDeprecated,
-  Dropdown as DropdownDeprecated,
-  DropdownItem as DropdownItemDeprecated,
-  DropdownGroup as DropdownGroupDeprecated,
-  KebabToggle as KebabToggleDeprecated,
 } from '@patternfly/react-core/deprecated';
 import { LogViewer, LogViewerSearch } from '@patternfly/react-log-viewer';
 import {
   CompressIcon,
+  EllipsisVIcon,
   ExpandIcon,
   DownloadIcon,
   OutlinedWindowRestoreIcon,
@@ -193,13 +188,14 @@ export const LogControls: React.FC<LogControlsProps> = ({
   const { t } = useTranslation();
   const [isLogTypeOpen, setLogTypeOpen] = React.useState(false);
   const isMobile = useIsMobile();
-  const [isToggleOpen, setIsToggleOpen] = React.useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
 
-  const onToggle = () => {
-    setIsToggleOpen(!isToggleOpen);
+  const onDropdownToggleClick = () => {
+    setIsDropdownOpen(!isDropdownOpen);
   };
-  const onSelect = () => {
-    setIsToggleOpen(false);
+
+  const onDropdownSelect = () => {
+    setIsDropdownOpen(false);
   };
 
   const logTypes: Array<LogType> = [
@@ -298,20 +294,9 @@ export const LogControls: React.FC<LogControlsProps> = ({
       });
 
       return isMobile ? (
-        <DropdownItemDeprecated
-          component={
-            <a // must be an anchor element in order for tabbing to work
-              className="co-external-link"
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              data-test-id={link.metadata.name}
-            >
-              {link.spec.text}
-            </a>
-          }
-          key={link.metadata.uid}
-        />
+        <DropdownItem to={url} isExternalLink key={link.metadata.uid}>
+          {link.spec.text}
+        </DropdownItem>
       ) : (
         <React.Fragment key={link.metadata.uid}>
           <ExternalLink href={url} text={link.spec.text} dataTestID={link.metadata.name} />
@@ -325,42 +310,6 @@ export const LogControls: React.FC<LogControlsProps> = ({
     });
 
   const label = t('public~Debug container');
-
-  const logViewerSearch = (
-    <LogViewerSearch
-      onFocus={() => {
-        if (status === STREAM_ACTIVE) {
-          toggleStreaming();
-        }
-      }}
-      placeholder="Search"
-      minSearchChars={0}
-    />
-  );
-
-  const debugAction = (
-    <>
-      {!isWindowsPod(resource) && (
-        <Link
-          to={`${resourcePath(
-            'Pod',
-            resource.metadata.name,
-            resource.metadata.namespace,
-          )}/containers/${containerName}/debug`}
-          data-test="debug-container-link"
-        >
-          {label}
-        </Link>
-      )}
-      {isWindowsPod(resource) && (
-        <Tooltip
-          content={t('public~Debug in terminal is not currently available for windows containers.')}
-        >
-          <span className="text-muted">{label}</span>
-        </Tooltip>
-      )}
-    </>
-  );
 
   const fullLog = (
     <div>
@@ -419,159 +368,151 @@ export const LogControls: React.FC<LogControlsProps> = ({
     </>
   );
 
-  const dropdownItems = [
-    <DropdownGroupDeprecated key="log actions" label={t('public~Log actions')}>
-      {!_.isEmpty(podLogLinks) && renderPodLogLinks()}
-      <DropdownItemDeprecated
-        key="show full log"
-        component="button"
-        onClick={(e) => {
-          e.preventDefault();
-          toggleShowFullLog(!isWrapLines);
-        }}
-      >
-        {fullLog}
-      </DropdownItemDeprecated>
-      <DropdownItemDeprecated
-        key="wrap lines"
-        component="button"
-        onClick={(e) => {
-          e.preventDefault();
-          toggleWrapLines(!isWrapLines);
-        }}
-      >
-        {wrapLines}
-      </DropdownItemDeprecated>
-      <DropdownItemDeprecated
-        key="raw"
-        component={
-          <a href={currentLogURL} target="_blank" rel="noopener noreferrer">
-            {raw}
-          </a>
-        }
-      />
-      <DropdownItemDeprecated
-        key="download"
-        component={
-          <a href={currentLogURL} download={`${resource.metadata.name}-${containerName}.log`}>
-            {download}
-          </a>
-        }
-      />
-      {screenfull.enabled && (
-        <DropdownItemDeprecated key="collapse" onClick={toggleFullscreen}>
-          {fullscreen}
-        </DropdownItemDeprecated>
-      )}
-    </DropdownGroupDeprecated>,
-  ];
-
   return (
-    <>
-      {isMobile ? (
-        <Toolbar isFullHeight isStatic>
-          <ToolbarContent>
-            <ToolbarGroup align={{ default: 'alignLeft' }} spacer={{ default: 'spacerNone' }}>
-              <ToolbarItem>{showStatus()}</ToolbarItem>
-            </ToolbarGroup>
-            <ToolbarGroup align={{ default: 'alignRight' }} spacer={{ default: 'spacerNone' }}>
-              <ToolbarItem>
-                {' '}
-                <DropdownDeprecated
-                  aria-label={t('public~Dropdown options')}
-                  onSelect={onSelect}
-                  toggle={<KebabToggleDeprecated id="Dropdown options" onToggle={onToggle} />}
-                  isOpen={isToggleOpen}
-                  position="right"
-                  isPlain
-                  dropdownItems={dropdownItems}
-                  isGrouped
+    <div className="co-toolbar">
+      <div
+        className={classNames('co-toolbar__group co-toolbar__group--left', {
+          'co-toolbar__group--alongside-kebab': isMobile,
+        })}
+      >
+        <div className="co-toolbar__item">{showStatus()}</div>
+        {dropdown && <div className="co-toolbar__item">{dropdown}</div>}
+        <div className="co-toolbar__item">{logTypeSelect(!hasPreviousLog)}</div>
+        <div className="co-toolbar__item">
+          <LogViewerSearch
+            onFocus={() => {
+              if (status === STREAM_ACTIVE) {
+                toggleStreaming();
+              }
+            }}
+            placeholder="Search"
+            minSearchChars={0}
+          />
+        </div>
+        {showDebugAction(resource, containerName) && !isWindowsPod(resource) && (
+          <Link
+            to={`${resourcePath(
+              'Pod',
+              resource.metadata.name,
+              resource.metadata.namespace,
+            )}/containers/${containerName}/debug`}
+            data-test="debug-container-link"
+          >
+            {label}
+          </Link>
+        )}
+        {showDebugAction(resource, containerName) && isWindowsPod(resource) && (
+          <Tooltip
+            content={t(
+              'public~Debug in terminal is not currently available for windows containers.',
+            )}
+          >
+            <span className="text-muted">{label}</span>
+          </Tooltip>
+        )}
+      </div>
+      <div
+        className={classNames(
+          'co-toolbar__group',
+          isMobile ? 'co-toolbar__group--kebab' : 'co-toolbar__group--right',
+        )}
+        data-test="log-links"
+      >
+        {isMobile ? (
+          <Dropdown
+            isOpen={isDropdownOpen}
+            onSelect={onDropdownSelect}
+            onOpenChange={(isOpen: boolean) => setIsDropdownOpen(isOpen)}
+            toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+              <MenuToggle
+                ref={toggleRef}
+                onClick={onDropdownToggleClick}
+                isExpanded={isDropdownOpen}
+                variant="plain"
+                className="pf-v5-u-mt-xs"
+              >
+                <EllipsisVIcon />
+              </MenuToggle>
+            )}
+            shouldFocusToggleOnSelect
+            isPlain
+            popperProps={{
+              position: 'right',
+            }}
+          >
+            <DropdownGroup label={t('public~Log actions')}>
+              <DropdownList>
+                {!_.isEmpty(podLogLinks) && renderPodLogLinks()}
+                <DropdownItem
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toggleShowFullLog(!isShowFullLog);
+                  }}
+                >
+                  {fullLog}
+                </DropdownItem>
+                <DropdownItem
+                  onClick={(e) => {
+                    e.preventDefault();
+                    toggleWrapLines(!isWrapLines);
+                  }}
+                >
+                  {wrapLines}
+                </DropdownItem>
+                <DropdownItem to={currentLogURL} isExternalLink>
+                  {raw}
+                </DropdownItem>
+                <DropdownItem to={currentLogURL} isExternalLink>
+                  {download}
+                </DropdownItem>
+                {screenfull.enabled && (
+                  <DropdownItem onClick={toggleFullscreen}>{fullscreen}</DropdownItem>
+                )}
+              </DropdownList>
+            </DropdownGroup>
+          </Dropdown>
+        ) : (
+          <div className="pf-v5-l-flex">
+            {!_.isEmpty(podLogLinks) && renderPodLogLinks()}
+            <div>{fullLog}</div>
+            <Divider
+              orientation={{
+                default: 'vertical',
+              }}
+            />
+            {wrapLines}
+            <Divider
+              orientation={{
+                default: 'vertical',
+              }}
+            />
+            <a href={currentLogURL} target="_blank" rel="noopener noreferrer">
+              {raw}
+            </a>
+            <Divider
+              orientation={{
+                default: 'vertical',
+              }}
+            />
+            <a href={currentLogURL} download={`${resource.metadata.name}-${containerName}.log`}>
+              {download}
+            </a>
+            {screenfull.enabled && (
+              <>
+                <Divider
+                  orientation={{
+                    default: 'vertical',
+                  }}
                 />
-              </ToolbarItem>
-            </ToolbarGroup>
-          </ToolbarContent>
-          <ToolbarContent>
-            <ToolbarGroup align={{ default: 'alignLeft' }}>
-              <Stack>
-                <StackItem>
-                  <ToolbarItem>
-                    <Split hasGutter>
-                      {dropdown && <SplitItem isFilled>{dropdown} </SplitItem>}
-                      <SplitItem isFilled>{logTypeSelect(!hasPreviousLog)}</SplitItem>
-                    </Split>
-                  </ToolbarItem>
-                </StackItem>
-                <StackItem>
-                  <ToolbarItem>
-                    <Split hasGutter>
-                      <SplitItem isFilled>{logViewerSearch}</SplitItem>
-                      {showDebugAction(resource, containerName) && (
-                        <SplitItem isFilled>{debugAction}</SplitItem>
-                      )}
-                    </Split>
-                  </ToolbarItem>
-                </StackItem>
-              </Stack>
-            </ToolbarGroup>
-          </ToolbarContent>
-        </Toolbar>
-      ) : (
-        <div className="co-toolbar">
-          <div className="co-toolbar__group co-toolbar__group--left">
-            <div className="co-toolbar__item">{showStatus()}</div>
-            {dropdown && <div className="co-toolbar__item">{dropdown}</div>}
-            <div className="co-toolbar__item">{logTypeSelect(!hasPreviousLog)}</div>
-            <div className="co-toolbar__item">{logViewerSearch}</div>
-            {showDebugAction(resource, containerName) && (
-              <div className="co-toolbar__item">{debugAction}</div>
+                <Button variant="link" isInline onClick={toggleFullscreen}>
+                  {fullscreen}
+                </Button>
+              </>
             )}
           </div>
-          <div
-            className="co-toolbar__group co-toolbar__group--right co-toolbar__group--right"
-            data-test="log-links"
-          >
-            <div className="pf-v5-l-flex">
-              {!_.isEmpty(podLogLinks) && renderPodLogLinks()}
-              <div>{fullLog}</div>
-              <Divider
-                orientation={{
-                  default: 'vertical',
-                }}
-              />
-              {wrapLines}
-              <Divider
-                orientation={{
-                  default: 'vertical',
-                }}
-              />
-              <a href={currentLogURL} target="_blank" rel="noopener noreferrer">
-                {raw}
-              </a>
-              <Divider
-                orientation={{
-                  default: 'vertical',
-                }}
-              />
-              <a href={currentLogURL} download={`${resource.metadata.name}-${containerName}.log`}>
-                {download}
-              </a>
-              {screenfull.enabled && (
-                <>
-                  <Divider
-                    orientation={{
-                      default: 'vertical',
-                    }}
-                  />
-                  <Button variant="link" isInline onClick={toggleFullscreen}>
-                    {fullscreen}
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   );
 };
 
