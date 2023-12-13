@@ -430,12 +430,12 @@ export const LogControls: React.FC<LogControlsProps> = ({
                 isExpanded={isDropdownOpen}
                 variant="plain"
                 className="pf-v5-u-mt-xs"
+                aria-label={t('public~Dropdown toggle')}
               >
                 <EllipsisVIcon />
               </MenuToggle>
             )}
             shouldFocusToggleOnSelect
-            isPlain
             popperProps={{
               position: 'right',
             }}
