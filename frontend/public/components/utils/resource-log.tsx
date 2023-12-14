@@ -462,7 +462,10 @@ export const LogControls: React.FC<LogControlsProps> = ({
                 <DropdownItem to={currentLogURL} isExternalLink>
                   {raw}
                 </DropdownItem>
-                <DropdownItem to={currentLogURL} isExternalLink>
+                <DropdownItem
+                  to={currentLogURL}
+                  download={`${resource.metadata.name}-${containerName}.log`}
+                >
                   {download}
                 </DropdownItem>
                 {screenfull.enabled && (
