@@ -52,21 +52,16 @@ describe('Admission Webhook Warning', () => {
         fixture: 'pod1.json',
         headers: {
           Warning: warning,
-          // 'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"',
         },
       })
         .as('matchedUrl')
         .as('users');
       yamlEditor.clickSaveCreateButton();
-      // Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {\"foo\"}"
-      // Verify the ...
       cy.byTestID('admission-webhook-warning-learn-more')
         .parents()
         .contains('Admission Webhook Warning');
       cy.byTestID('admission-webhook-warning-learn-more').parents().contains(warning);
       cy.byTestID('admission-webhook-warning-learn-more').contains('Learn more');
-      // eslint-disable-next-line cypress/no-unnecessary-waiting
-      // cy.wait(2000);
       detailsPage.sectionHeaderShouldExist('Pod details');
     });
   });
