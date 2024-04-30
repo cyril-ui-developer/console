@@ -57,10 +57,12 @@ describe('Admission Webhook Warning', () => {
       yamlEditor.clickSaveCreateButton();
       // Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {\"foo\"}"
       // Verify the ...
-      cy.byTestID('admission-webhook-notification-learn-more')
+      cy.byTestID('admission-webhook-warning-learn-more')
         .parents()
         .contains('This is a test warning message');
-      cy.byTestID('admission-webhook-notification-learn-more').contains('Learn more');
+      cy.byTestID('admission-webhook-warning-learn-more').contains('Learn more');
+      // eslint-disable-next-line cypress/no-unnecessary-waiting
+      //  cy.wait(5000);
       detailsPage.sectionHeaderShouldExist('Pod details');
     });
   });
