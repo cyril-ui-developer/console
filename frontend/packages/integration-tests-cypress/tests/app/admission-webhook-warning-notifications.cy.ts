@@ -26,6 +26,8 @@ spec:
         capabilities:
           drop:
             - ALL`;
+const warning =
+  'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"';
 
 describe('Admission Webhook Warning', () => {
   before(() => {
@@ -49,8 +51,8 @@ describe('Admission Webhook Warning', () => {
       cy.intercept('POST', '/api/kubernetes/api/v1/namespaces/default/pods', {
         fixture: 'pod1.json',
         headers: {
-          Warning:
-            'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"',
+          Warning: warning,
+          // 'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"',
         },
       })
         .as('matchedUrl')
@@ -60,12 +62,11 @@ describe('Admission Webhook Warning', () => {
       // Verify the ...
       cy.byTestID('admission-webhook-warning-learn-more')
         .parents()
-        .contains(
-          'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"',
-        );
+        .contains('Admission Webhook Warning');
+      cy.byTestID('admission-webhook-warning-learn-more').parents().contains(warning);
       cy.byTestID('admission-webhook-warning-learn-more').contains('Learn more');
       // eslint-disable-next-line cypress/no-unnecessary-waiting
-      //  cy.wait(5000);
+      // cy.wait(2000);
       detailsPage.sectionHeaderShouldExist('Pod details');
     });
   });
