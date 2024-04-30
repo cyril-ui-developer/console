@@ -26,6 +26,53 @@ spec:
         capabilities:
           drop:
             - ALL`;
+
+// const bulkPodToDisplayWarning = `apiVersion: v1
+//             kind: Pod
+//             metadata:
+//               name: ${POD_NAME}-example1
+//               labels:
+//                 app: httpd
+//               namespace: default
+//             spec:
+//               securityContext:
+//                 runAsNonRoot: true
+//                 seccompProfile:
+//                   type: RuntimeDefault
+//               containers:
+//                 - name:  ${CONTAINER_NAME}
+//                   image: 'image-registry.openshift-image-registry.svc:5000/openshift/httpd:latest'
+//                   ports:
+//                     - containerPort: 8080
+//                   securityContext:
+//                     allowPrivilegeEscalation: false
+//                     capabilities:
+//                       drop:
+//                         - ALL
+// ---
+// apiVersion: v1
+//             kind: Pod
+//             metadata:
+//               name: ${POD_NAME}-example2
+//               labels:
+//                 app: httpd
+//               namespace: default
+//             spec:
+//               securityContext:
+//                 runAsNonRoot: true
+//                 seccompProfile:
+//                   type: RuntimeDefault
+//               containers:
+//                 - name:  ${CONTAINER_NAME}
+//                   image: 'image-registry.openshift-image-registry.svc:5000/openshift/httpd:latest'
+//                   ports:
+//                     - containerPort: 8080
+//                   securityContext:
+//                     allowPrivilegeEscalation: false
+//                     capabilities:
+//                       drop:
+//                         - ALL
+// `;
 const warning =
   'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"';
 
