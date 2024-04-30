@@ -49,7 +49,8 @@ describe('Admission Webhook Warning', () => {
       cy.intercept('POST', '/api/kubernetes/api/v1/namespaces/default/pods', {
         fixture: 'pod1.json',
         headers: {
-          Warning: 'This is a test warning message',
+          Warning:
+            'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"',
         },
       })
         .as('matchedUrl')
@@ -59,7 +60,9 @@ describe('Admission Webhook Warning', () => {
       // Verify the ...
       cy.byTestID('admission-webhook-warning-learn-more')
         .parents()
-        .contains('This is a test warning message');
+        .contains(
+          'Pod example violates policy 299 - "[pod-must-have-label-foo] you must provide labels: {"foo"}"',
+        );
       cy.byTestID('admission-webhook-warning-learn-more').contains('Learn more');
       // eslint-disable-next-line cypress/no-unnecessary-waiting
       //  cy.wait(5000);
