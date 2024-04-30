@@ -53,10 +53,9 @@ describe('Admission Webhook Warning', () => {
         headers: {
           Warning: warning,
         },
-      })
-        .as('matchedUrl')
-        .as('users');
+      }).as('podCreated');
       yamlEditor.clickSaveCreateButton();
+      cy.wait('@podCreated');
       cy.byTestID('admission-webhook-warning-learn-more')
         .parents()
         .contains('Admission Webhook Warning');
