@@ -247,7 +247,7 @@ const App = (props) => {
           <CloudShell />
           <GuidedTour />
         </div>
-        <div id="modal-container" role="dialog" aria-modal="true" />
+        <div id="modal-container" data-test="modal-container" role="dialog" aria-modal="true" />
       </QuickStartDrawer>
       <ConsoleNotifier location="BannerBottom" />
       <FeatureFlagExtensionLoader />
