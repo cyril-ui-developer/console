@@ -63,63 +63,67 @@ describe('Deprecated operator warnings', () => {
       .should('be.visible');
   });
 
-  it('verify deprecated operator warnings on the Install Operator modal', () => {
-    cy.log('visit Install Operator modal');
+  it('verify deprecated operator warnings in the OperatorHub details panel', () => {
     cy.visit(
       '/operatorhub/all-namespaces?keyword=kia&details-item=kiali-test-community-operator-deprecation-openshift-marketplace&channel=stable&version=1.83.0',
     );
-    cy.log('verify the Deprecated badge on Kiali Community Operator logo');
+    cy.log('verify the deprecated operator badge exists');
     cy.byTestID(DEPRECATED_OPERATOR_WARNING_BADGE_ID)
       .contains(deprecatedBadge)
       .should('be.visible');
 
-    cy.log(
-      'verify the package deprecation warning exists, and the channel and version warnings do not exist',
-    );
-
+    cy.log('verify the package deprecation warning exists when viewing a deprecated operator');
     cy.byTestID('deprecated-operator-warning-package')
       .contains(deprecatedPackageMessage)
       .should('exist');
+  });
+
+  it('verify deprecated channel warnings in the OperatorHub details panel', () => {
+    cy.visit(
+      '/operatorhub/all-namespaces?keyword=kia&details-item=kiali-test-community-operator-deprecation-openshift-marketplace&channel=stable&version=1.83.0',
+    );
+
+    cy.log('verify the channel deprecation warnings do not exist yet');
     cy.byTestID(DEPRECATED_OPERATOR_WARNING_PACKAGE_ID)
       .contains(deprecatedChannelMessage)
       .should('not.exist');
-    cy.byTestID(DEPRECATED_OPERATOR_WARNING_VERSION_ID)
-      .contains(deprecatedVersionMessage)
-      .should('not.exist');
+    cy.byTestID('deprecated-operator-warning-channel-icon').should('not.exist');
+    cy.log('verify the channel deprecation warning icon exists in the channel select menu');
+    // force click because parent PF modal component causes button not to be "visible"
+    cy.byTestID('operator-channel-select-toggle').should('exist').click({
+      force: true,
+    });
+    cy.byTestID('deprecated-operator-warning-channel-icon').should('exist');
+    // force click because parent PF modal component causes button not to be "visible"
+    cy.get('[data-test="channel-option-alpha"] > button').click({ force: true });
 
-    cy.log('verify the channel deprecation warning exists, and the version warnings do not exist');
-    // Previous working code before the rebase
-    // cy.get('.co-operator-channel__select')
-    //   .children('.pf-v5-c-select__toggle')
-    //   .click({ force: true });
-
-    // One of the option tried due to change in the Channel selection component
-    cy.byTestID('operator-channel-select').click({ force: true });
-    cy.get('.pf-v5-c-menu').children('[data-test="channel-option-alpha"]').click({ force: true });
-
-    // This would likely change as the channel selection component is changed
-    cy.byTestID('channel-option-alpha')
-      .children()
-      .children('[data-test="deprecated-operator-warning-channel-icon"]')
-      .should('exist');
-    cy.byTestID('channel-option-alpha').click({ force: true });
-
+    cy.log('verify the channel deprecation alert exists after selecting a deprecated channel');
     cy.byTestID(DEPRECATED_OPERATOR_WARNING_CHANNEL_ID)
       .contains(deprecatedChannelMessage)
       .should('exist');
+  });
+
+  it('verify deprectaed version warnings in the OperatorHub details panel', () => {
+    cy.visit(
+      '/operatorhub/all-namespaces?keyword=kia&details-item=kiali-test-community-operator-deprecation-openshift-marketplace&channel=stable&version=1.83.0',
+    );
+
+    cy.log('verify the version deprecation warnings do not exist yet');
     cy.byTestID(DEPRECATED_OPERATOR_WARNING_VERSION_ID)
       .contains(deprecatedVersionMessage)
       .should('not.exist');
-
-    cy.log('verify the version deprecation warning exists');
-    cy.get('.co-operator-version__select')
-      .children('.pf-v5-c-select__toggle')
-      .click({ force: true });
-    cy.byTestID('version-option-kiali-operator.v1.68.0')
-      .children()
-      .children('[data-test="deprecated-operator-warning-version-icon"]')
-      .should('exist');
-    cy.byTestID('version-option-kiali-operator.v1.68.0').click({ force: true });
+    cy.byTestID('deprecated-operator-warning-version-icon').should('not.exist');
+    cy.log('verify the version deprecation warning icon exists in the version select menu');
+    // force click because parent PF modal component causes button not to be "visible"
+    cy.byTestID('operator-version-select-toggle').click({
+      force: true,
+    });
+    cy.byTestID('deprecated-operator-warning-version-icon').should('exist');
+    // force click because parent PF modal component causes button not to be "visible"
+    cy.get('[data-test="version-option-kiali-operator.v1.68.0"] > button').click({ force: true });
+    cy.log(
+      'verify the version deprecation warning alert exists after selecting a deprecated version',
+    );
     cy.byTestID(DEPRECATED_OPERATOR_WARNING_VERSION_ID)
       .contains(deprecatedVersionMessage)
       .should('exist');

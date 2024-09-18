@@ -72,7 +72,7 @@ export const OperatorChannelSelect: React.FC<OperatorChannelSelectProps> = ({
             isFullWidth
             aria-label={t('olm~Select a channel')}
             className="co-operator-channel__select"
-            data-test="operator-channel-select"
+            data-test="operator-channel-select-toggle"
           >
             {getChannelLabel(channels.find((f) => f.name === selectedUpdateChannel))}
           </MenuToggle>
@@ -171,6 +171,7 @@ export const OperatorVersionSelect: React.FC<OperatorVersionSelectProps> = ({
             isFullWidth
             aria-label={t('olm~Select a version')}
             className="co-operator-version__select"
+            data-test="operator-version-select-toggle"
           >
             {getVersionLabel(
               selectedChannelVersions.find((v) => v.version === selectedUpdateVersion),
